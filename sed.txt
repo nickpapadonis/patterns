@@ -686,10 +686,26 @@ printf "1\na\n2\nb\n3\na\n" | sed -n -e '/a/!h' -e '/a/{x;p}'
 #     Print the pattern space.
 
 
-printf "a\n1\nb\n2\n" | sed -n -e '/1/!h' -e '/1/{H;x;p}'
-a
+printf "1\na\n2\nb\n3\na\n" | sed -n -e '/a/!h' -e '/a/{H;x;p}'
 1
+a
+3
+a
+
+printf "1\na\n2\nb\n3\na\n" | sed -n -e '/a/!h' -e '/a/{H;x;s/\n/:/;p}'
+1:a
+3:a
 
 
-printf "a\n1\nb\n2\n" | sed -n -e '/1/!h' -e '/1/{H;x;s/\n/:/;p}'
-a:1
+# 'g'
+#      Replace the contents of the pattern space with the contents of the
+#      hold space.
+# 
+printf "1\na\n2\nb\n3\na\n" | sed -n -e '/a/!h' -e '/a/{g;p}'
+1
+3
+
+printf "1\na\n2\nb\n3\na\n" | sed -n -e '/a/!h' -e '/a/{x;G;s/\n/:/;p}'
+1:a
+3:a
+
