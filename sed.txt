@@ -1,0 +1,695 @@
+# SED Behavior
+# 1. Read a line from the input stream, until \n, removes trailing \n and
+#    if it exists and places it into the pattern space.
+#
+# 2. Commands are executed; each command can have an address associated
+#    to it.  Addresses are conditions for command execution.
+#
+# 3. When the end of the command script is reached this is a complete
+#    cycle and, the contents of the pattern space are printed to the output
+#    stream adding back the newline if it was removed.  The -n option
+#    prevents this.
+#
+#    * Unless special commands are used, the pattern space is deleted
+#    between two cycles.  The hold space keeps data between cycles.
+#    'h', 'H', 'x', 'g', 'G' moves data between buffers. 
+#
+# 4. Repeat for the next line until end of input
+#
+#    If -n is specified the pattern space is not output and it must
+#    be explicitly printed with the commands p or P.
+
+# SYNTAX
+# [addr]X[options]
+# X := single letter command
+# [addr] := optional line address for sed to execute on
+# [options] := used for some commands
+
+# Pattern space is the internal buffer where sed places and modifies
+# the line it reads from the input file.  The hold space is an additional
+# buffer to hold temporary data.  Sed allows movement of data between
+# the two spaces.  The pattern space is deleted every cycle in sed execution
+# flow.  The hold space is retained for all the cycles of execution flow.
+
+
+# Supress pattern space echo, print first line of input.
+printf "a\nb\nc\n" | sed -n '1p'
+a
+
+# ! inverts. all lines that are not 1 address
+printf "a\nb\nc\n" | sed -n '1!p'
+b
+c
+
+# same but between range 1,2
+printf "a\nb\nc\n" | sed -n '1,2p'
+a
+b
+
+# same, but do not suppress input pattern space
+printf "a\nb\nc\n" | sed '1,2p'
+a
+a
+b
+b
+c
+
+# delete input pattern 1-2
+printf "a\nb\nc\n" | sed  '1,2d'
+c
+
+# no option to print
+printf "a\nb\nc\n" | sed  -n '1,2d'
+
+
+# 'p' prints the pattern buffer, which is temporary scratch buffer
+# 
+# print pattern space, echo input after command applied
+#
+
+printf "a\nb\nc\n" | sed 'p'
+a
+a
+b
+b
+c
+c
+
+# print without echo of input
+printf "a\nb\nc\n" | sed -n 'p'
+a
+b
+c
+
+$ cat test-script.sed 
+/^a/ p
+/^c/ p
+
+# same with a file
+$ printf "a\nb\nc\n" | sed -n -f test-script.sed 
+a
+c
+
+# same, but one line
+$ printf "a\nb\nc\n" | sed -nE '/^a/ p; /^b/ p'
+a
+b
+
+# specify address range
+# print second line, 'n,m' means n through m
+$ printf "1,a\n2,b\n" | sed -n '2 p'
+2,b
+
+# print first and second line
+$ printf "1,a\n2,b\n" | sed -n '1,2 p'
+1,a
+2,b
+
+# print 1st line + 1
+$ printf "1,a\n2,b\n" | sed -n '1,+1 p'
+1,a
+2,b
+
+# print odd lines, 'n~m' means skip m lines btwn commands
+printf "a\nb\nc\nd\n" | sed -n '0~2 p'
+b
+d
+
+printf "a\nb\nc\nd\n" | sed -n '0~1 p'
+a
+b
+c
+d
+
+# match pattern
+printf "a\nb\nc\n" | sed -n '/a/ p'
+a
+
+# print lines starting from match to 3rd line,
+# if no match, print match after 3rd line
+printf "a\nb\nc\n\z" | sed -n '/b/,3 p'
+b
+c
+
+printf "a\nb\nc\nz\nh\n" | sed -n '/h/,3 p'
+h
+
+# print from b until c is matched
+printf "a\nb\nc\n" | sed -nE '/b/,/c/ p'
+b
+c
+
+printf "a\nb\np\nc\n" | sed -n '/b/,/c/ p'
+b
+p
+c
+
+# print from first match of 'b' until last line
+$ printf "a\nb\nc\n" | sed -n '/b/,$ p'
+b
+c
+
+# print from match of 'a' and 1 line immediately after that
+printf "a\nb\nc\n" | sed -n '/a/,+1 p'
+a
+b
+
+# match everything and deletes pattern from output stream
+printf "a\nb\nc\n" | sed 'd'
+
+# delete the first line from the output stream
+printf "a\nb\nc\n" | sed '1 d'
+b
+c
+
+# delete lines matching pattern
+printf "a\nb\nc\n" | sed '/b/ d'
+a
+c
+
+# delete from pattern to last line
+printf "a\nb\nc\n" | sed '/b/,$ d'
+a
+
+# delete all empty lines from file
+printf "a\nb\n\nc\n" | sed '/^$/,$ d'
+a
+b
+
+# write pattern space to file
+printf "a\nb\nc\n" | sed -n 'w test.txt'
+np@debian:~$ cat test.txt 
+a
+b
+c
+
+# write pattern space to file, second and third line
+printf "a\nb\nc\n" | sed -n '2,3 w test.txt'; cat test.txt
+b
+c
+
+# write pattern space to file, 'b' to end of line
+printf "a\nb\nc\n" | sed -n '/b/,$ w test.txt'; cat test.txt
+b
+c
+
+# substitute command, replaces first occurance of string
+# on each line
+# 's/REGEXP/REPLACEMENT/FLAGS'.
+# 
+# The 's' command attempts to match the
+# pattern space against the supplied regular expression REGEXP; if the
+# match is successful, then that portion of the pattern space which was
+# matched is replaced with REPLACEMENT.
+# 
+printf "a\nb\nc\nd\n" | sed -n 's/c/z/ p'
+z
+printf "a\nb\nc\nd\n" | sed 's/c/z/'n
+a
+b
+z
+d
+
+printf "a\nb\ncc\nd\n" | sed 's/c/z/'
+a
+b
+zc
+d
+
+# replace all occurances on line
+printf "a\nb\ncc\nd\n" | sed 's/c/z/g'
+a
+b
+zz
+d
+
+# replace second occurance of pattern in line
+printf "a\naa\n" | sed 's/a/z/2'
+a
+az
+
+# first occurance
+printf "a\naa\n" | sed 's/a/z/1'
+z
+za
+
+# print the changed line
+$ printf "a\naa\n" | sed -n 's/a/z/1p'
+z
+za
+
+# same but write flag to write to file
+$ printf "a\naa\n" | sed -n 's/a/z/1w output.txt'; cat output.txt
+z
+za
+
+# ignore case
+printf "a\nA\np\n" | sed 's/a/z/i'
+z
+z
+p
+
+printf "a\nA\np\n" | sed -n 's/a/z/ip'
+z
+z
+
+# gnu option, execute whatever is in pattern space as a shell cmd
+printf "a\nb\n" | sed -En 's/^/echo /ep'
+a
+b
+
+printf "bash -c time" | sed -n 's/^/ /ep'
+
+real	0m0.000s
+user	0m0.000s
+sys	0m0.000s
+
+
+# handling forward slashing for pattern recognition
+printf "/usr/local/bin\n" | sed -n '/\/usr/p'
+/usr/local/bin
+printf "/usr/local/bin\n" | sed -n '/\/\/usr/p'
+
+# any character can be used as a substitution char
+printf "/usr/local/bin\n" | sed -n 's/\|\/usr\|\/bin//p'
+/local/bin
+
+
+# if there are two commands, sed will execute 1 on the 
+# pattern space then 2 on the pattern space.  If 1 modifies
+# the pattern space, 2 will be executed on the changed pattern
+# space and not the original line that was read
+
+$ printf "a\nb\nc\n" | sed '{s/a/x/; s/a/z/; s/c/y/}'
+x
+b
+y
+
+printf "a\nb\nc\n" | sed '{s/a/x/; s/x/z/; s/c/y/}'
+z
+b
+y
+
+$ printf "a\nb\nc\n" | sed -n '{s/a/x/ p; s/a/z/ p; s/c/y/ p}'
+x
+y
+
+# get matched pattern, '&' is replaced with whatever
+# text matched the original pattern
+printf "a\nb\nc\n" | sed -n '{s/[a-z]/[&]/p}'
+[a]
+[b]
+[c]
+
+printf "a\nb\nc\n" | sed -n '{s/^.*/[&]/p}'
+[a]
+[b]
+[c]
+
+# groupings
+printf "ap\nb\nc\n" | sed -n '{s/\(^a\)\(p$\)/\1\2/p}'
+ap
+
+printf "ap\nb\nc\n" | sed -n '{s/\(^a\)\(p$\)/\2\1/p}'
+pa
+
+echo "ab" | sed -n 's/\([a-z]\)/\(\1\)/gp'
+(a)(b)
+
+# BRE vs ERE -E
+# BRE: ?, +, {}, (), | taken as literal
+# ERE: \?, \+, \{\}, \(\), \| taken as literal
+# For each \., \[\] is required to have literal
+# use ERE for easier reading
+
+# BRE
+printf "[a]\n" | sed -n 's/\[\([a-z]\)\]/\1/p'
+a
+# ERE
+printf "[a]\n" | sed -nE 's/\[([a-z])\]/\1/p'
+a
+
+# match a and two literal '.'s, no match
+printf "a.b\n" | sed -n 's/a\.\./z/p'
+
+# '\.' is the literal match
+printf "a.\n" | sed -n 's/\./b/p'
+ab
+printf "a.\n" | sed -nE 's/\./b/p'
+ab
+
+# '.' matches any charcter including newline
+# '*' matches a sequence of zero or more preceeding expression
+# '\+' matches a sequence of one or more preceeding expression (GNU)
+# '\?' matches a seqeuence of zero or one of preceeding expression (GNU)
+# '^' matches null string at beginning of pattern space
+# '$' matches null string at end of pattern space
+# [LIST] matches any single character in LIST or ^LIST, which is not in list
+#    ^ if it's a list item do not make it first element
+#    a-z if range
+# \{I\} same as '*' but matches exactly I sequences
+# \{I,J\} matches between I and J, inclusive sequences
+# \{I,\} matches more than or equal to I sequences
+# \(REGEX\) group as a whole
+
+echo "1234" | sed -En 's/(^|[^0-9.])([0-9]+)([0-9]{3})/\1\2,\3/gp'
+1,234
+
+# multiple groupings, sed can only 9, \1 through \9
+# matches anything not a ',' 0 or more occurance, up to a comma
+echo "1,a" | sed -En 's/([^,]*),([^,]*)/\2.\1/gp'
+a.1
+
+# same but reversal on printout
+echo "1t,ap" | sed -En 's/([^,]*),([^,]*)/\2.\1/gp'
+ap.1t
+
+printf "t.p\nt.z\nh.p\n" | sed -E 's/^.*(t.|h.)//g'
+p
+z
+p
+
+# same but line range 1 - 2 inclusive
+printf "t.p\nt.z\nh.p\n" | sed -E '1,2 s/^.*(t.|h.)//g'
+p
+z
+h.p
+
+# \n is matched as first character
+$ printf "\nt.p\nt.z\nh.p\n" | sed -E '/^\.*t/,/^.*t/ s/^.*(t.|h.)//g'
+p
+z
+h.p
+
+# multiple commands to branch
+printf "start\n\nt.p\nt.z\nh.p\n" | sed -E '{ /^t./bx ; /^h./by ; bz ; :x s//x./ ; :y s//y./ ; :z }'
+start
+
+x.p
+x.z
+y.p
+
+# del all newlines except last, 't' is branch conditionally
+printf "start\nt.p\nt.z\nh.p\n" | sed -E ':loop ; $!N; s/\n//; t loop' | od -t c
+0000000   s   t   a   r   t   t   .   p   t   .   z   h   .   p  \n
+0000017
+
+# append after pattern
+printf "start\nt.p\nt.z\nh.p\n" | sed -E '/start/ a hi'
+start
+hi
+t.p
+t.z
+h.p
+
+# append
+printf "a\nb\nc\n" | sed '/b/ a g'
+a
+b
+g
+c
+
+# insert before
+printf "a\nb\nc\n" | sed '/b/ i g'
+a
+g
+b
+c
+
+# append below pattern
+printf "start\nt.p\nt.z\nh.p\n" | sed -E  '/start/i hi'
+hi
+start
+t.p
+t.z
+h.p
+
+# change line
+printf "a\nb\nc\n" | sed '/b/ c z'
+a
+z
+c
+
+# del pattern space
+$ printf "start\nt.p\nt.z\nh.p\n" | sed -E  '/start/d'
+t.p
+t.z
+h.p
+
+# replace
+printf "start\nt.p\nt.z\nh.p\n" | sed -E  's/start/&.new/'
+start.new
+t.p
+t.z
+h.p
+
+# replace with backreference
+printf "start\nt.p\nt.z\nh.p\n" | sed -E  's/(start)\1/\1.new/'
+start
+t.p
+t.z
+h.p
+
+# make repl for only nth occurance on line
+printf "start-start\nt.p\nt.z\nh.p\n" | sed -E 's/t./x./1'
+sx.rt-start
+x.p
+x.z
+h.p
+
+# apply functions to those not matched by regex
+printf "start\nt.p\nt.z\nh.p\n" | sed -E  '/t/!{ s/.*/z/ }'
+start
+t.p
+t.z
+z
+
+# write out line number followed by newline
+printf "start\nt.p\nt.z\nh.p\n" | sed -En  '/start/{ = }'
+1
+
+printf "start\nt.p\nt.z\nh.p\n" | sed -En  '/t.p/{ = }'
+2
+
+# read line into pattern buffer, copy hold buffer to pattern
+# buffer separated by a \n
+printf "a\nb\n" | sed -E 'G' | od -t c
+0000000   a  \n  \n   b  \n  \n
+0000006
+
+
+# XXX reverse string
+printf "a\nb\nc\n" | sed -En '1,1!G;h;$p'
+c
+b
+a
+
+seq 1 10 | sed -En '/^2$/,/^4$/p'
+2
+3
+4
+
+# all lines starting with a
+printf "a\n\nab\nabc\n\bc\nz\n" | sed -n '/^a/p'
+a
+ab
+abc
+
+# delete sequence from pattern space and print
+printf "a\nab\nabc\nbc\nc\n" | sed -n '/^a.*$/d; /^.*/p'
+bc
+c
+
+printf "a\nab\nabc\nbc\nc\n" | sed '/^a.*$/d'
+bc
+c
+
+# print line numbers
+printf "a\nb\nc\n" | sed =
+1
+a
+2
+b
+3
+c
+
+# quit after command
+printf "a\nb\nc\n" | sed '1 q'
+a
+printf "a\nb\nc\n" | sed '/c/ q'
+a
+b
+c
+printf "a\nb\nc\n" | sed '/b/ q'
+a
+b
+
+
+# 'cat' emulation
+printf "a\nb\n" | sed -n 'p'
+a
+b
+
+# 'n' prints current pattern space and fetches next line from input
+# this occurs during command execution so it can change the flow between
+# other commands
+printf "a\nb\n" | sed 'n'
+a
+b
+
+printf "a\nb\n" | sed 'N'
+a
+b
+
+# 'grep'
+printf "a\nb\n" | sed -n 's/b/&/p'
+
+printf "a\nb\n" | sed -n '/b/p'
+b
+
+printf "a\nb\n" | sed -n '/b/ !p'
+a
+
+# 'head'
+printf "a\nb\n" | sed -n '1,1 p'
+a
+
+printf "a\nb\n" | sed '2,$ d'
+a
+
+# USE OF HOLD SPACE
+# -----------------
+
+# Pattern space is deleted every cycle
+# Hold space is retained for each cycle
+
+# '!' if is not found
+# 'G' :
+#      Append a newline to the contents of the pattern space, and then
+#      append the contents of the hold space to that of the pattern space.
+#
+# 'h' :
+#     (hold) Replace the contents of the hold space with the contents of
+#     the pattern space.
+# 'p'
+#      Print the pattern space.
+#
+# '$'
+#     This address matches the last line of the last file of input, or
+#     the last line of each file when the '-i' or '-s' options are
+#     specified.
+#
+
+printf "1\n2\n3\n" | sed -n '1!G;h;$p'
+3
+2
+1
+
+# Previous analyzed:
+# 1. (1!G)	ps = 1		hs = _		not satisfied
+# 2. (h)	ps = 1		hs = 1		repl. hs with ps (temp)
+# 3. $		ps = 1 		hs = 1		not satisfied
+# 4. *cycle*	ps = _ 		hs = 1		not satisfied
+# 5. (1!G)	ps = 2 		hs = 1		satisifed
+#               ps = 2\n 	hs = 1		app. \n to ps
+#               ps = 2\n1 	hs = 1		app. hs to ps
+# 3. (h)	ps = 2\n1	hs = 2\n1	repl. hs with ps (temp)
+# 4. *cycle*	ps = _		hs = 2\n1	clear ps
+# 5. (1!G)	ps = 3		hs = 2\n1	satisifed
+#		ps = 3\n	hs = 2\n1	app. \n to ps
+#		ps = 3\n2\n1	hs = 2\n1	app. hs to ps
+# 6. (h)	ps = 3\n2\n1	hs = 3\n2\n1	repl. hs with ps (temp)
+# 7. cycle	ps = _		hs = 3\n2\n1	clear ps
+# 8. (1!G)	ps = _		hs = 3\n2\n1	not satisfied
+# 9. (h)	ps = 3\n2\n1	hs = 3\n2\n1	repl ps with hs
+#10. ($p)					satisfied, print ps
+
+
+
+# /x/ address.  If addres (regex, line) is matched command executed only on
+#               these addresses
+# 'e COMMAND'
+#     Executes COMMAND and sends its output to the output stream.  The
+#     command can run across multiple lines, all but the last ending with
+#     a back-slash.
+#
+# 'x'
+#     Exchange the contents of the hold and pattern spaces.
+#
+# 'n'
+#     (next) If auto-print is not disabled, print the pattern space,
+#     then, regardless, replace the pattern space with the next line of
+#    input.  If there is no more input then 'sed' exits without
+#     processing any more commands.
+# 'p'
+#     Print the pattern space.
+
+
+# printf "1\na\n2\nb\n3\na\n" | sed -n -e 'x;n' -e '/a/{x;p}'
+1
+3
+
+# Previous analyzed:
+# 0. cycle.s	 ps = _		hs = _		cycle start
+# 1. cycle.s	 ps = 1		hs = _		read in next ps
+# 2. (x)	 ps = _		hs = 1		exchange contents ps & hs
+# 3. (n)	 ps = _		hs = 1		print ps if ~-n
+# 4. (n)	      		     	  _	
+# 5. (n)	 ps = a		hs = 1		repl. ps with next input line
+# 6. (/a/)	 ps = a		hs = 1		matched addr
+# 7. (x)	 ps = 1		hs = a		exchange contents ps & hs
+# 8. (p)	 ps = 1 	hs = a	  1	print ps
+# 9. cycle.e	      		   	  *1	print ps if ~-n
+#10. cycle.s	 ps = _		hs = a		clear ps
+#11. cycle.s	 ps = 2		hs = a		read in next ps
+#10. (x)	 ps = a		hs = 2		exchange contents ps & hs
+#11. (n)	 ps = a		hs = 2	  a	print ps if ~-n
+#12. (n)	 ps = b		hs = 2		repl. ps with next input line
+#13. (/a/)	 ps = b		hs = 2		no matched addr
+#14. cycle.e	 ps = b		hs = 2	  b	print ps if ~n
+#15. cycle.s	 ps = _		hs = 2		cycle start
+#16. cycle.s	 ps = 3		hs = 2		read in next ps
+#17. (x)	 ps = 2		hs = 3		exchange contents ps hs
+#18. (n)	 ps = 2		hs = 3	  2	print ps if ~-n
+#19. (n)	 ps = a		hs = 3		repl. ps with next input line
+#20. (/a/)	 ps = a		hs = 3		matched addr
+#21. (x)	 ps = 3		hs = a		exchange contents ps & hs
+#22. (p)	 ps = 3 	hs = a	  3	print ps
+#23. cycle.e	      		   	  *3	print ps if ~-n
+
+
+
+# '!' if is not found
+# 'h'
+#     (hold) Replace the contents of the hold space with the contents of
+#     the pattern space.
+# 'x'
+#     Exchange the contents of the hold and pattern spaces.
+# 'p'
+#     Print the pattern space.
+
+# save copy of line before in hold space, then exchanges it
+# when pattern of line is matched.
+printf "1\na\n2\nb\n3\na\n" | sed -n -e '/a/!h' -e '/a/{x;p}'
+1
+3
+
+# 'h'
+#     (hold) Replace the contents of the hold space with the contents of
+#     the pattern space.
+# 'H'
+#     Append a newline to the contents of the hold space, and then append
+#     the contents of the pattern space to that of the hold space.
+# 'x'
+#     Exchange the contents of the hold and pattern spaces.
+# 'p'
+#     Print the pattern space.
+
+
+printf "a\n1\nb\n2\n" | sed -n -e '/1/!h' -e '/1/{H;x;p}'
+a
+1
+
+
+printf "a\n1\nb\n2\n" | sed -n -e '/1/!h' -e '/1/{H;x;s/\n/:/;p}'
+a:1
