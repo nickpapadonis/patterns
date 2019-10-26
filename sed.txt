@@ -759,8 +759,8 @@ b
 e3
 
 
-### LOOP BRANCH
-#--------------
+# BRANCHING, LOOPING AND FLOW CONTROL
+# -----------------------------------
 
 # The branching commands 'b', 't', and 'T' enable changing the flow of
 # 'sed' programs.
@@ -809,7 +809,9 @@ printf "e1\na\ne2\nb\ne3\na\n" | sed -n -e 'h;n;H;x' -e 's/\n/:/' -e '/a/!b end'
 e2:b
 *e3:a
 
-printf "e1\na\ne2\nb\ne3\na\n" | sed -n -e 'h;n;H;x' -e 's/\n/:/' -e ':repeat' -e '/a/s/^/*/' -e '/\*\*\*/!t repeat' -e 'p'
+printf "e1\na\ne2\nb\ne3\na\n" | sed -n -e 'h;n;H;x' -e 's/\n/:/' -e ':repeat' -e '/a/s/^/\*/' -e '/\*\*\*/!t repeat' -e 'p'
 ***e1:a
 e2:b
 ***e3:a
+
+
