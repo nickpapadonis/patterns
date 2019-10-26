@@ -1,12 +1,14 @@
 # SED Behavior
-# 1. Read a line from the input stream, until \n, removes trailing \n and
-#    if it exists and places it into the pattern space.
+# 1. SED maintains an initially empty patter and hold space.
 #
-# 2. Commands are executed; each command can have an address associated
+# 2. Read a line from the input stream, removes trailing \n and
+#    and places it into the pattern space.
+#
+# 3. Commands are executed; each command can have an address associated
 #    to it.  Addresses are conditions for command execution.
 #
-# 3. When the end of the command script is reached this is a complete
-#    cycle and, the contents of the pattern space are printed to the output
+# 4. When the end of the command script is reached this is a complete
+#    cycle and the contents of the pattern space are printed to the output
 #    stream adding back the newline if it was removed.  The -n option
 #    prevents this.
 #
@@ -14,7 +16,7 @@
 #    between two cycles.  The hold space keeps data between cycles.
 #    'h', 'H', 'x', 'g', 'G' moves data between buffers. 
 #
-# 4. Repeat for the next line until end of input
+# 5. Repeat for the next line until end of input
 #
 #    If -n is specified the pattern space is not output and it must
 #    be explicitly printed with the commands p or P.
@@ -560,6 +562,10 @@ a
 # USE OF HOLD SPACE
 # -----------------
 
+# SED processes one line at a time, unless using -H, -G, -N to create
+# multiple lines separated by new line.
+# H, G, N append with \n netween.  h, g, n replace.
+
 # Pattern space is deleted every cycle
 # Hold space is retained for each cycle
 
@@ -705,7 +711,105 @@ printf "1\na\n2\nb\n3\na\n" | sed -n -e '/a/!h' -e '/a/{g;p}'
 1
 3
 
+# 'G'
+#      Append a newline to the contents of the pattern space, and then
+#      append the contents of the hold space to that of the pattern space.
+# 
 printf "1\na\n2\nb\n3\na\n" | sed -n -e '/a/!h' -e '/a/{x;G;s/\n/:/;p}'
 1:a
 3:a
 
+# 'N'
+#      Add a newline to the pattern space, then append the next line of
+#      input to the pattern space.  If there is no more input then 'sed'
+#      exits without processing any more commands.
+# 
+# 
+printf "1\na\n2\nb\n3\na\n" | sed -e '{N;s/\n/:/}'
+1:a
+2:b
+3:a
+
+printf "1,a1,a\n2,b1,b\n2,a2,a\n" | sed -e '=' -
+1
+1,a1,a
+2
+2,b1,b
+3
+2,a2,a
+
+printf "1,a1,a\n2,b1,b\n2,a2,a\n" | sed -e '=' - | sed -e '{N;s/\n/ /}'
+1 1,a1,a
+2 2,b1,b
+3 2,a2,a
+
+
+# 'P'
+#      Print the pattern space, up to the first <newline>.
+#
+printf "1\na\n2\nb\n3\na\n" | sed -n -e 'N' -e '/a/P' 
+1
+3
+
+printf "e1\na @al@\ne2\nb @bl@\ne3\nc @cl@" | sed -e '/@/{N;/@.*@/{s/@.*@//;P;D}}' 
+e1
+a 
+e2
+b 
+e3
+
+
+### LOOP BRANCH
+#--------------
+
+# The branching commands 'b', 't', and 'T' enable changing the flow of
+# 'sed' programs.
+# 
+# 'b'
+#      branch unconditionally (that is: always jump to a label, skipping
+#      or repeating other commands, without restarting a new cycle).
+#      Combined with an address, the branch can be conditionally executed
+#      on matched lines.
+# 
+# 't LABEL'
+#      (test) Branch to LABEL only if there has been a successful
+#      's'ubstitution since the last input line was read or conditional
+#      branch was taken.  The LABEL may be omitted, in which case the next
+#      cycle is started.
+# 
+# 'T LABEL'
+#      (test) Branch to LABEL only if there have been no successful
+#      's'ubstitutions since the last input line was read or conditional
+#      branch was taken.  The LABEL may be omitted, in which case the next
+#      cycle is started.
+# 
+# ': LABEL'
+#      Specify the location of LABEL for branch commands ('b', 't', 'T').
+#
+
+# 'h'
+#      Replace the contents of the hold space with the contents of the
+#      pattern space.
+# 
+# 'H'
+#      Append a newline to the contents of the hold space, and then append
+#      the contents of the pattern space to that of the hold space.
+# 'n'
+#      If auto-print is not disabled, print the pattern space, then,
+#      regardless, replace the pattern space with the next line of input.
+#      If there is no more input then 'sed' exits without processing any
+#      more commands.
+# 
+#      This command is useful to skip lines (e.g.  process every Nth
+#      line).
+# 
+
+printf "e1\na\ne2\nb\ne3\na\n" | sed -n -e 'h;n;H;x' -e 's/\n/:/' -e '/a/!b end' -e 's/^/*/' -e ':end' -e 'p'
+*e1:a
+e2:b
+*e3:a
+
+printf "e1\na\ne2\nb\ne3\na\n" | sed -n -e 'h;n;H;x' -e 's/\n/:/' -e ':repeat' -e '/a/s/^/*/' -e '/\*\*\*/!t repeat' -e 'p'
+***e1:a
+e2:b
+***e3:a
