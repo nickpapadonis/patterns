@@ -1,0 +1,521 @@
+
+# -F field separator, uses empty space if not specified
+# /pattern/ is optional, if not specified awk processes all
+#  records from input-file.  If specified awk will process
+#  only those records fromthe input file which match the given
+#  pattern.
+# {action} is awk programming commands, which can be one
+#  or multiple.
+# input-file is the file that needs to be processed
+awk -Fs '/pattern/ {action}' input-file
+awk -Fs '{action}' input-file
+
+# $0 prints entire line
+printf "abc,bef\nc,d" | awk 'BEGIN {FS=","} {print $0}'
+abc,bef
+c,d
+
+# $1 first field
+printf "abc,bef\nc,d" | awk 'BEGIN {FS=","} {print $1}'
+abc
+c
+
+# Default field separator -F is a <space>
+
+echo 'a:b' | awk -F: '/a/ {print $1}'
+a
+
+# Awk program structure: (BEGIN, body, END)
+# BEGIN { awk-commands } : executed once at beginning before
+#   awk begins executing the body block for all the lines
+#   in the input file.
+#   This block is optional.
+#
+# /pattern/ {action} : body block, executed once for every line
+#   in the input file.
+#
+# END { awk-commands } : executed only once after awk completes
+#   executing the body block for all lines in the input file
+#   This block is optional.
+
+echo 'a:b:c' | awk 'BEGIN { FS=":";print "--begin--" } /b/ {print $1} END { print "--end--" }' 
+--begin--
+a
+--end--
+echo 'a:b:c' | awk 'BEGIN { FS=":";print "--begin--" } /b/ {print $2} END { print "--end--" }' 
+--begin--
+b
+--end--
+
+echo 'a:b:c' | awk 'BEGIN { FS=":";print "--begin--" } /b/ {print "."} {print $2} {print $1} {print "."} END { print "--end--" }' 
+--begin--
+.
+b
+a
+.
+--end--
+
+# print, prints the full record
+echo 'a:b:c' | awk 'BEGIN { FS=":";print "--begin--" } /b/ {print} END { print "--end--" }' 
+--begin--
+a:b:c
+--end--
+
+echo 'a:b:c' | awk 'BEGIN { FS=":";print "--begin--" } /b/ {print "."} {print $1, $2, $3} {print "."} END { print "--end--" }' 
+--begin--
+.
+a b c
+.
+--end--
+
+echo 'a:b:c' | awk 'BEGIN { FS=":";print "--begin--" } /b/ {print "."} {print $1 $2 $3} {print "."} END { print "--end--" }' 
+--begin--
+.
+abc
+.
+--end--
+
+echo 'a:b:c' | awk 'BEGIN { FS=":";print "--begin--" } /b/ {print "."} {print $1} {print $2} {print $3} {print "."} END { print "--end--" }' 
+--begin--
+.
+a
+b
+c
+.
+--end--
+
+
+printf '1 a\n2 b\n3 c\n' | awk 'BEGIN { FS=" ";print "--begin--" } /b/ {print $1} END { print "--end--" }'
+--begin--
+2
+--end--
+
+printf 'a.1\nb.2\nc.3\n' | awk 'BEGIN { FS=":";print "--begin--" } /b/ {print} END { print "--end--" }' 
+--begin--
+b.2
+--end--
+
+
+ printf 'a.1\nb.2\nc.3\n' | awk 'BEGIN { FS=".";print "--begin--" } /^b/ {print "B =", $2} END { print "--end--" }' 
+--begin--
+B = 2
+--end--
+
+# can use -F for field separator
+printf 'a.1*z\nb.2*y\nc.3*x\n' | awk -F '*' 'BEGIN { print "--begin--" } /^b/ {print $2} END { print "--end--" }'
+
+# use \t
+printf 'a.1\nb.2\nc.3\n' | awk 'BEGIN { FS=".";print "--begin--" } /^b/ {print "B", "\t", $2} END { print "--end--" }' 
+--begin--
+B 	 2
+--end--
+
+# multiple field separators
+printf 'a.1*z\nb.2*y\nc.3*x\n' | awk 'BEGIN { FS="[.*]";print "--begin--" } /^b/ {print $1, "\t", $2, "\t", $3} END { print "--end--" }' 
+--begin--
+b 	 2 	 y
+--end--
+
+# OFS: by default awk prints output fields with space between fields
+#
+printf 'a.1*z\nb.2*y\nc.3*x\n' | awk 'BEGIN { FS="[.*]" } /^b/ {print $1, $2, $3}'
+b 2 y
+# field separator is now tabs between print
+printf 'a.1*z\nb.2*y\nc.3*x\n' | awk 'BEGIN { FS="[.*]"; OFS="\t"} /^b/ {print $1, $2, $3}'
+b	2	y
+
+# With and without a field separator
+awk 'BEGIN { print "a","b" }'
+a b
+awk 'BEGIN { print "a" "b" }'
+ab
+
+# without a regex
+printf 'a.1*z\nb.2*y\nc.3*x\n' | awk 'BEGIN { FS="[.*]"; OFS="\t"} {print $1, $2, $3}'
+a	1	z
+b	2	y
+c	3	x
+
+# use RS to separate records, typically is \n
+ printf 'a.1:b.2:c.3' | awk 'BEGIN { FS="."; RS=":"; OFS="\t"} {print $1, $2}'
+a	1
+b	2
+c	3
+
+# Separate records by -\n
+printf 'a\n1\n-\nb\n2\n-\nc\n3\n' | awk 'BEGIN { FS="\n"; RS="-\n"; OFS=":"} {print $1, $2}'
+a:1
+b:2
+c:3
+
+# with Output Record Separator ORS
+printf 'a\n1\n-\nb\n2\n-\nc\n3\n' | awk 'BEGIN { FS="\n"; RS="-\n"; OFS=":"; ORS="\n---\n"} {print $1, $2}'
+a:1
+---
+b:2
+---
+c:3
+---
+
+printf 'a\n1\n-\nb\n2\n-\nc\n3\n' | awk 'BEGIN { FS="\n"; RS="-\n"; OFS="\n"; ORS="\n---\n"} {print $1, $2}'
+a
+1
+---
+b
+2
+---
+c
+3
+---
+
+
+# NR : Number of records
+# When used inside the loop it gives the line number
+# When used inside the END block, it gives the total number of records
+#   in the file.
+printf 'a.1\nb.2\nc.3\n' | awk 'BEGIN { FS="." } /^b/ {print NR, $1} END { }' 
+2 b
+
+printf 'a.1\nb.2\nc.3\n' | awk 'BEGIN { FS="." } /^b/ {print NR, $1} END { print "total",NR }' 
+2 b
+total 3
+
+
+# prints the filename
+printf 'a.1\nb.2\nc.3\n' > t
+awk 'BEGIN { FS="." } /^b/ {print FILENAME; print $1} END { }' t
+t
+b
+
+# - if stdin
+printf 'a.1\nb.2\nc.3\n' | awk 'BEGIN { FS="." } /^b/ {print FILENAME, $1} END { }'
+- b
+
+# FNR File "Number of Record" which operates on a per file basis
+# printf 'a.1\nb.2\nc.3\n' > t
+awk 'BEGIN { FS="." } /^b/ {print FNR; print $1} END { }' t t2
+2
+b
+2
+b
+awk 'BEGIN { FS="." } /^b/ {print NR; print $1} END { }' t t2
+2
+b
+5
+b
+
+awk 'BEGIN { FS="." } /^b/ {print FILENAME, FNR, $1} END { }' t t2
+t 2 b
+t2 2 b
+
+# variable total
+printf 'a.1\nb.2\nc.3\n' | awk 'BEGIN { FS="."; total=0 } /^b|^c/ {print $1; total=total+1} END { print total }'
+b
+c
+2
+
+# total++
+printf 'a.1\nb.2\nc.3\n' | awk 'BEGIN { FS="."; total=0 } /^b|^c/ {print $1; total++} END { print total }'
+b
+c
+2
+# total --
+printf 'a.1\nb.2\nc.3\n' | awk 'BEGIN { FS="."; total=0 } /^b|^c/ {print $1; total--} END { print total }'
+b
+c
+-2
+
+printf 'a.1\nb.2\nc.3\n' | awk 'BEGIN { FS="." } /^b|^c/ {print -$2 } END { }'
+-2
+-3
+
+# negate the number
+printf 'a.-1\nb.-2\nc.-3\n' | awk 'BEGIN { FS="." } /^b|^c/ {print -$2 } END { }'
+2
+3
+
+# auto increment
+printf 'a.1\nb.1\nc.1\n' | awk 'BEGIN { FS="." } /^b|^c/ {print ++$2 } END { }'
+2
+2
+
+# post increment example
+printf 'a.1\nb.1\nc.1\n' | awk 'BEGIN { FS="." } /^b|^c/ {print $2; $2++; print $2 } END { }'
+1
+2
+1
+2
+
+# print occurances of a
+printf "a\n\b\na\n" | awk '/a/ { n++ }; END { print n }'
+2
+
+# arithmetic
+printf "a\n\b\na\n" | awk '/a/ { n++ }; END { print n*20/2-1+1 }'
+19
+
+# print even lines, NR is number of record
+printf "a\n\b\na\n" | awk 'NR % 2'
+a
+a
+
+# String operator
+# space is the operator that does concatenation
+printf "a\n\b\nc\n" | awk 'BEGIN { FS=" "; s1="a"; s2="c"; s3=s1 s2 s1; print s3 }'
+aca
+
+# assignment operators
+awk 'BEGIN { total = 10; total += 2 ; print total ; total -= 2 ; print total ; total *= 1 ; print total ; total /= 1 ; print total ; total %= 2 ; print total}'
+12
+10
+10
+10
+0
+
+# add
+printf "1\n2\n" | awk 'BEGIN { t=0 } { t += $1 } END {print "t=" t}'
+t=3
+
+# count total number of fields
+printf "1.b\n2.c\n" | awk 'BEGIN { FS="."; t=0 } { t += NF } END {print "t=" t}'
+t=4
+
+# comparison operators
+printf "1.b\n2.c\n" | awk -F "." '$1 >= 2'
+2.c
+printf "1.b\n2.c\n" | awk -F "." '$1 >= 2 {print $2}'
+c
+
+printf "1.b\n2.c\n" | awk -F "." '$1 == 1 {print $2}'
+b
+
+printf "1.b\n2.c\n" | awk -F "." '$2 == "c" {print $2}'
+c
+
+# and
+printf "1.b\n2.c\n" | awk -F "." '$2 == "c" && $1 == 2 {print $2}'
+c
+
+# or
+printf "1.b\n2.c\n" | awk -F "." '$2 == "c" || $1 == 1 {print $2}'
+b
+c
+
+# looks for partial match.  ~ contains
+printf "1.a\n2.b\n" | awk '$1 ~ "1"'
+1.a
+
+# does not contain
+printf "1.a\n2.b\n" | awk '$1 !~ "1"'
+2.b
+
+# NF is number of fields
+printf "a.1.2\n" | awk 'BEGIN { FS="." } { print NF }'
+3
+
+# Conditional expressions
+# if (conditional) { action1; action2; }
+
+printf "a.1.2\n" | awk 'BEGIN { FS="." } { if ($3 > 1) print $3 }'
+2
+printf "a.1.2\n" | awk 'BEGIN { FS="." } { if ($3 > 2) print $3 }'
+
+
+# if (conditional) { action1 } else { action2 }
+# conditional ? action1 : action2
+printf "a.1.2\n" | awk 'BEGIN { FS="." } { if ($3 > 2) { print $3 } else { print $1 } }'
+a
+
+# NR%2 == 0 on even number of records (NR), OFS=","
+#      == 1 on odd number of records, OFS="+"
+printf "a\nb\nc\nd\n" | awk 'ORS=NR%2?",":"+"'
+a,b+c,d+
+
+# while loop
+# while(condition) actions
+
+# concatenate x 3 times
+awk 'BEGIN { while (count++<3) string=string "x"; print string }'
+xxx
+
+printf "a b c\n" | awk '{ t=0; i=1; while (i <= NF) { print $i; t+=1; i++}; print t}'
+a
+b
+c
+3
+
+# do while
+awk 'BEGIN {c=3; do {print c; c--;} while(c!=0); }'
+3
+2
+1
+
+printf "a b c" | awk '{print NF}'
+3
+
+printf "a b c" | awk '{ i=0; do {i++} while(i<NF) print i}'
+3
+
+# for loop
+# for(init;condition;inicrement/decrement)
+printf "a b c" | awk '{ for (i=1;i<=NF;i++) { print $i; } }'
+a
+b
+c
+
+printf "a b c" | awk '{ for (i=1;i<=NF;i++) { print $i; } } END {print i}'
+a
+b
+c
+4
+
+printf "a b c" | awk '{ for (i=1;i<=NF;i++) { print $i; tot+=1} } END {print tot}'
+a
+b
+c
+3
+
+# print in reverse
+printf "a b c" | awk '{ for (i=NF;i>0;i--) { print $i; tot+=1} }'
+c
+b
+a
+
+# break statement, break out on "b"
+printf "a b c" | awk '{ for (i=1;i<=NF;i++) { if ($i == "b") { break; } print $i; tot+=1} } END {print tot}'
+a
+1
+
+# infinite loop
+awk 'BEGIN { while(1) print "." }'
+
+awk 'BEGIN { x=0; while(1) { print "."; if (x == 2) { break; } x++; } }'
+.
+.
+.
+
+
+# alternate even (X) odd (x)
+awk 'BEGIN { x=0; while(1) { if (x == 3) { break; } if (x % 2) { print "x"; } else { print "X"; }; x++; } }'
+X
+x
+X
+
+# exit statement
+awk 'BEGIN { x=0; while(1) { print "."; if (x == 1) { exit; } x++; } }'
+.
+.
+
+# Arrays.  Associative.  Index/value.  Index does not have to be numbers
+# arrayname[string]=value
+
+$ awk 'BEGIN {item[0]="a"; item[1]="b"; item[2]="c"; print item[2]; print item[1]; print item[0]}'
+c
+b
+a
+
+# by index number
+awk 'BEGIN {item[0]="a"; item[1]="b"; item[2]="c"; for(i=0;i<3;i++) { print item[i]; } }'
+a
+b
+c
+
+# by element
+awk 'BEGIN {item[0]="a"; item[1]="b"; item[2]="c"; for(i in item) { print item[i]; } }'
+a
+b
+c
+
+# delete item[2]
+awk 'BEGIN {item[0]="a"; item[1]="b"; item[2]="c"; delete item[2]; for(i in item) { print item[i]; } }'
+a
+b
+
+# sort array values, lose original index
+awk 'BEGIN {item[1]="b"; item[2]="a"; item[3]="c"; for(i=1;i<4;i++) { print item[i]; } total=asort(item); print "" ; for(i=1;i<4;i++) { print item[i]; } }'
+b
+a
+c
+
+a
+b
+c
+
+# sort array values but keep original indexes
+awk 'BEGIN {item[1]="b"; item[2]="a"; item[3]="c"; for(i=1;i<4;i++) { print item[i]; } total=asort(item, itemnew); print "" ; for(i=1;i<=total;i++) { print itemnew[i]; } }'
+b
+a
+c
+
+a
+b
+c
+
+# printf
+awk 'BEGIN { printf "f0\tf1\t\n" }'
+f0	f1
+
+# The print command chnages based on OFS and ORS. printf does not use these values
+# it only uses what is specified in the format field.
+printf "a,b\nc" | awk 'BEGIN {FS=",";OFS=":";ORS="\n--\n";} { print $1 $2 $3 }'
+ab
+--
+c
+--
+
+printf "a,b\nc,d" | awk 'BEGIN {FS=","} { printf "%s^^%s\n", $1, $2 }'
+a^^b
+c^^d
+
+# fixed width right justified
+printf "abc,bef\nc,d" | awk 'BEGIN {FS=","} { printf "%3s%3s\n", $1, $2 }'
+abcbef
+  c  d
+
+# fixed width left justified
+printf "abc,bef\nc,d" | awk 'BEGIN {FS=","} { printf "%-3s%-3s\n", $1, $2 }'
+abcbef
+c  d  
+
+# print absolute fixed width string value
+printf "abc,bef\nc,d" | awk 'BEGIN {FS=","} { printf "%.2s%.2s\n", $1, $2 }'
+abbe
+cd
+
+# Other functions to be aware of
+# int(n) : integer part of an argument
+# log(n)
+# sqrt(n)
+# exp(n)
+# sin(n)
+# cos(n)
+# atan2(m, n)
+# rand()
+# srand(n) : used to initialize random number with a seed
+# index(x, "substr") : index of a given string, idx starts at 1
+# length(x) : length of a string
+# split(input-string, output-array, separator): splits string into individual array elems
+# substr(input-string, location, length) : extracts portion of given string
+# and(n0, n1)
+# or(n0, n1)
+# xor(n0, n1)
+# lshift(n0, x)
+# rshift(n0, x)
+# system()
+# systime()
+# strftime("%c", systime())
+
+# user defined functions
+# function fn-name(params)
+# {
+#   body
+# }
+
+# 1. awk reads first line of input and stores in $0
+# 2. getline stores next line in tmp
+# goto 1.
+# prints only every other line
+printf "a\nb\nc\n" | awk '{getline tmp; print $1}'
+a
+c
+
